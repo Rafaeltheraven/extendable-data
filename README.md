@@ -43,5 +43,7 @@ fn main() {
 }
 ```
 
+Any attributes and generics used in the definitions for enums `A` and `B` are combined and copied over. For the name and visibility, only those of `B` are used and are directly copied over.
+
 ## Cargo
 Because this package uses `proc-macro`, I am not allowed to export any functions which are not procedural macros. However, the `extendable_enum` macro makes use of a helper function to construct the proper `TokenStream`, which is in itself not a procedural macro. As such, a second package exists which exports this function: [extendable-enums-helpers](https://github.com/Rafaeltheraven/extendable-enums-helpers). You are required to include both packages in your dependencies section of `Cargo.toml`.
