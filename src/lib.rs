@@ -4,7 +4,7 @@ use syn::{parse_macro_input, DeriveInput};
 use quote::quote;
 
 #[proc_macro_attribute]
-pub fn extendable_enum(args: TokenStream, source: TokenStream) -> TokenStream {
+pub fn extendable_data(args: TokenStream, source: TokenStream) -> TokenStream {
     let mut name_string = args.to_string();
     let source_ast = parse_macro_input!(source as DeriveInput);
     if args.is_empty() {
@@ -22,7 +22,7 @@ pub fn extendable_enum(args: TokenStream, source: TokenStream) -> TokenStream {
                 #source_ast
             });
             let dst_convert: TokenStream2 = dst.into();
-            let resp: TokenStream = extendable_enums_helpers::combine_enums(base, dst_convert).into();
+            let resp: TokenStream = extendable_data_helpers::combine_data(base, dst_convert).into();
             resp
         }
     })

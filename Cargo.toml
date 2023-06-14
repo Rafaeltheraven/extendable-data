@@ -1,9 +1,9 @@
 [package]
-name = "extendable-enums"
-version = "0.1.1"
-description = "A set of rust macros that allows you to specify enums that can be \"extended\" or inherited from."
+name = "extendable-data"
+version = "0.1.0"
+description = "A set of rust macros that allows you to specify data that can be \"extended\" or inherited from."
 license = "MIT"
-repository = "https://github.com/Rafaeltheraven/extendable-enums"
+repository = "https://github.com/Rafaeltheraven/extendable-data"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -13,7 +13,6 @@ syn = "2.0.18"
 quote = "1.0.28"
 proc-macro2 = "1.0.59"
 logos = "0.13.0"
-extendable-enums-helpers = "0.1.1"
 
 [lib]
 proc-macro = true

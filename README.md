@@ -1,14 +1,13 @@
-# extendable-enums
-A set of rust macros that allows you to specify enums that can be "extended" or inherited from. 
+# extendable-data
+A rust macro that allows you to specify data that can be "extended" or inherited from. With data, I mean specifically `enum`, `struct` and `union`.
 
 ## Why not composition/traits/some other method
-This project started because I was using the very nice [logos](https://github.com/maciejhirsz/logos) library and I wanted to define 2 lexer with some of the same base tokens
-but extended. I could not find a proper way to do this that was not simply copy-pasting the parts of the enum that I needed, so I set about bodging it with macro abuse.
-
-Technically this approach could also be used for doing the same with structs, but I haven't looked into that yet.
+This project started because I was using the very nice [logos](https://github.com/maciejhirsz/logos) library and I wanted to define 2 lexers with some of the same base tokens,
+but extended. I could not find a proper way to do this that was not simply copy-pasting the parts of the enum that I needed, so I set about bodging it with macro abuse. I then extended
+the approach I used for enums to also support structs and unions.
 
 ## How to Use
-Simply, define the base enum (`A`) that you want to use. Then add the `#[extendable_enum]` attribute to it. This will automatically generate a new macro called `extend_from_A` (or you can specify a name in the attribute arguments). Now, use this new macro for the extended enum `B`.
+Simply, define the base enum (`A`) that you want to use. Then add the `#[extendable_data]` attribute to it. This will automatically generate a new macro called `extend_from_A` (or you can specify a name in the attribute arguments). Now, use this new macro for the extended enum `B`.
 
 ### Example
 ```rust
@@ -45,5 +44,15 @@ fn main() {
 
 Any attributes and generics used in the definitions for enums `A` and `B` are combined and copied over. For the name and visibility, only those of `B` are used and are directly copied over.
 
+## Structs
+As opposed to enums and unions, not all types of structs make sense to combine together. As such, the following design decisions were made:
+
+* Combining two named structs just generates a new named structs.
+* Combining two unnamed structs just generates a new unnamed struct.
+* Combining two unit structs just generates a new unit struct.
+* Combining a unit struct with anything else will generate the other type of struct (so a unit with a named will generate a named), regardless of which is the "parent".
+
+Technically you could allow the combining of named and unnamed structs, or have the parent matter more when combining with unit structs, but the former would promote even more ugly coding habits than this library already does, and the latter seemed a less common use-case.
+
 ## Cargo
-Because this package uses `proc-macro`, I am not allowed to export any functions which are not procedural macros. However, the `extendable_enum` macro makes use of a helper function to construct the proper `TokenStream`, which is in itself not a procedural macro. As such, a second package exists which exports this function: [extendable-enums-helpers](https://github.com/Rafaeltheraven/extendable-enums-helpers). You are required to include both packages in your dependencies section of `Cargo.toml`.
+Because this package uses `proc-macro`, I am not allowed to export any functions which are not procedural macros. However, the `extendable_data` macro makes use of a helper function to construct the proper `TokenStream`, which is in itself not a procedural macro. As such, a second package exists which exports this function: [extendable-data-helpers](https://crates.io/crates/extendable-data-helpers). You are required to include both packages in your dependencies section of `Cargo.toml`.
