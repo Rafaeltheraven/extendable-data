@@ -32,7 +32,7 @@ proc-macro2 = "1.0.59"
 syn = {workspace = true}
 quote = {workspace = true}
 proc-macro2 = {workspace = true}
-extendable-data-helpers = {path = "extendable-data-helpers"}
+extendable-data-helpers = "0.1.2"
 
 [dev-dependencies]
 syn = {features = ["extra-traits"]}
