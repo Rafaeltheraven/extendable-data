@@ -1,0 +1,18 @@
+[package]
+name = "extendable-data-helpers"
+version = "0.1.1"
+description = "Proc macros for the extendable-data package because cargo makes things difficult."
+license = "MIT"
+repository = "https://github.com/Rafaeltheraven/extendable-data"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+syn = "2.0.18"
+quote = "1.0.28"
+proc-macro2 = "1.0.59"
+logos = "0.13.0"
+
+[lib]
+proc-macro = true
