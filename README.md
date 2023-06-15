@@ -11,7 +11,7 @@ Simply, define the base enum (`A`) that you want to use. Then add the `#[extenda
 
 ### Example
 ```rust
-use extendable_enums::extendable_enum;
+use extendable_data::extendable_data;
 
 #[extendable_enum(extend_a)]
 enum A {
@@ -53,6 +53,3 @@ As opposed to enums and unions, not all types of structs make sense to combine t
 * Combining a unit struct with anything else will generate the other type of struct (so a unit with a named will generate a named), regardless of which is the "parent".
 
 Technically you could allow the combining of named and unnamed structs, or have the parent matter more when combining with unit structs, but the former would promote even more ugly coding habits than this library already does, and the latter seemed a less common use-case.
-
-## Cargo
-Because this package uses `proc-macro`, I am not allowed to export any functions which are not procedural macros. However, the `extendable_data` macro makes use of a helper function to construct the proper `TokenStream`, which is in itself not a procedural macro. As such, a second package exists which exports this function: [extendable-data-helpers](https://crates.io/crates/extendable-data-helpers). You are required to include both packages in your dependencies section of `Cargo.toml`.

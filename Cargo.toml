@@ -1,10 +1,10 @@
 [package]
 name = "extendable-data"
-version = "0.1.0"
-description = "A set of rust macros that allows you to specify data that can be \"extended\" or inherited from."
 license = "MIT"
-repository = "https://github.com/Rafaeltheraven/extendable-data"
+version = "0.1.2"
 edition = "2021"
+description = "A set of rust macros that allows you to specify data that can be \"extended\" or inherited from."
+repository = "https://github.com/Rafaeltheraven/extendable-data"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,7 +12,7 @@ edition = "2021"
 syn = "2.0.18"
 quote = "1.0.28"
 proc-macro2 = "1.0.59"
-logos = "0.13.0"
+extendable-data-helpers = {path = "./extendable-data-helpers"}
 
-[lib]
-proc-macro = true
+[dev-dependencies]
+syn = {features = ["extra-traits"]}
