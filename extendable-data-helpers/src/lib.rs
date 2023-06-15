@@ -1,5 +1,5 @@
-use proc_macro2::Span;
-use proc_macro::TokenStream;
+use proc_macro2::{Ident, Span};
+use proc_macro::{TokenStream};
 use syn::{parse_macro_input, DeriveInput};
 use quote::quote;
 
@@ -10,7 +10,7 @@ pub fn extendable_data(args: TokenStream, source: TokenStream) -> TokenStream {
     if args.is_empty() {
         name_string = format!("extend_from_{}", source_ast.ident);
     }
-    let name = syn::Ident::new(&name_string, Span::call_site());
+    let name = Ident::new(&name_string, Span::call_site());
     TokenStream::from(quote! {
         use quote::quote;
         use proc_macro2::TokenStream as TokenStream2;

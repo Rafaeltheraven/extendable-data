@@ -1,18 +1,38 @@
 [package]
 name = "extendable-data"
-license = "MIT"
-version = "0.1.2"
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+categories.workspace = true
+keywords.workspace = true
+repository.workspace = true
+edition.workspace = true
 description = "A set of rust macros that allows you to specify data that can be \"extended\" or inherited from."
-repository = "https://github.com/Rafaeltheraven/extendable-data"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
+[workspace]
+members = ["extendable-data-helpers"]
+
+[workspace.package]
+version = "0.1.2"
+authors = ["Rafael Dulfer"]
+repository = "https://github.com/Rafaeltheraven/extendable-data"
+license = "MIT"
+edition = "2021"
+keywords = ["proc-macro", "extensible", "structs", "enums", "unions"]
+categories = ["data-structures", "development-tools::procedural-macro-helpers", "rust-patterns"]
+
+[workspace.dependencies]
 syn = "2.0.18"
 quote = "1.0.28"
 proc-macro2 = "1.0.59"
-extendable-data-helpers = {path = "./extendable-data-helpers"}
+
+[dependencies]
+syn = {workspace = true}
+quote = {workspace = true}
+proc-macro2 = {workspace = true}
+extendable-data-helpers = {path = "extendable-data-helpers"}
 
 [dev-dependencies]
 syn = {features = ["extra-traits"]}
