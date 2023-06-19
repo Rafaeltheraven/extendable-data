@@ -37,9 +37,9 @@ fn combine_generics(input_a: Generics, input_b: Generics) -> Generics {
 
 fn combine_enums<'input>(enum_a: &'input syn::DataEnum, enum_b: &'input syn::DataEnum) -> TokenStream {
     let data = enum_a.variants.iter().chain(enum_b.variants.iter());
-    TokenStream::from(quote!({
+    quote!({
         #(#data),*
-    }))
+    })
 }
 
 fn combine_structs<'input>(struct_a: &'input syn::DataStruct, struct_b: &'input syn::DataStruct) -> TokenStream {
@@ -69,12 +69,12 @@ fn combine_structs<'input>(struct_a: &'input syn::DataStruct, struct_b: &'input 
 
 fn combine_unions<'input>(union_a: &'input syn::DataUnion, union_b: &'input syn::DataUnion) -> TokenStream {
     let data = union_a.fields.named.pairs().chain(union_b.fields.named.pairs());
-    TokenStream::from(quote!({
+    quote!({
         #(#data),*
-    }))
+    })
 }
 
-fn construct_stream<'input>(
+fn construct_stream (
         data: TokenStream, 
         data_token: Ident, 
         visibility: &syn::Visibility, 
@@ -82,10 +82,10 @@ fn construct_stream<'input>(
         name: syn::Ident, 
         attrs: Vec<syn::Attribute>
     ) -> TokenStream {
-    TokenStream::from(quote! {
+    quote! {
         #(#attrs)*
         #visibility #data_token #name #gens #data
-    })
+    }
 } 
 
 /// Combines two enums into a single enum using TokenStreams.
@@ -101,9 +101,9 @@ pub fn combine_data(input_a: TokenStream, input_b: TokenStream) -> TokenStream {
     let generics = combine_generics(ast_a.generics, ast_b.generics);
     let attrs = ast_a.attrs.into_iter().chain(ast_b.attrs.into_iter()).collect();
     let (data, data_token) = match (&ast_a.data, &ast_b.data) {
-        (syn::Data::Enum(enum_a), syn::Data::Enum(enum_b)) => (combine_enums(&enum_a, &enum_b), "enum"),
-        (syn::Data::Struct(struct_a), syn::Data::Struct(struct_b)) => (combine_structs(&struct_a, &struct_b), "struct"),
-        (syn::Data::Union(union_a), syn::Data::Union(union_b)) => (combine_unions(&union_a, &union_b), "union"),
+        (syn::Data::Enum(enum_a), syn::Data::Enum(enum_b)) => (combine_enums(enum_a, enum_b), "enum"),
+        (syn::Data::Struct(struct_a), syn::Data::Struct(struct_b)) => (combine_structs(struct_a, struct_b), "struct"),
+        (syn::Data::Union(union_a), syn::Data::Union(union_b)) => (combine_unions(union_a, union_b), "union"),
         _ => panic!("Can only combine 2 of the same type of data structure!")
     };
     construct_stream(data, Ident::new(data_token, Span::call_site()), vis_b, generics, ast_b.ident, attrs)
