@@ -223,12 +223,14 @@ impl Args {
     }
 }
 
-/// Combines two enums into a single enum using TokenStreams.
+/// Combines two datas into a single data using TokenStreams.
 ///
-/// Used internally by extendable-enums to construct a tokenstream which has the contents
-/// of two enums glued together. The name of the enum in input_b will be the name of the "new" enum.
+/// Additionally, optionally a stream of arguments can provided. At time of writing, the supported arguments are
+/// `merge_on_conflict` and `filter(list)`. 
 ///
-/// Technically this could probably be extended to structs as well, but I haven't looked into it.
+/// The resulting TokenStream can then be used by a procedural macro to generate code that represents the new combined data.
+///
+/// See extendable_data_helpers::extendable_data for the macro that generates the code.
 pub fn combine_data(input_a: TokenStream, input_b: TokenStream, args_input: Option<TokenStream>) -> TokenStream {
     let ast_a = match syn::parse2::<DeriveInput>(input_a) {
         Ok(a) => a,

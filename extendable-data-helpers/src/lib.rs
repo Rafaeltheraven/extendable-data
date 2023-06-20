@@ -3,6 +3,11 @@ use proc_macro::{TokenStream};
 use syn::{parse_macro_input, DeriveInput};
 use quote::quote;
 
+/// Procedural attribute macro that combines ("extends") data.
+///
+/// Generates a new procedural macro which allows you to extend some data structure A into data structure B. 
+///
+/// See extendable_data::combine_data for how the data is actually combined.
 #[proc_macro_attribute]
 pub fn extendable_data(args: TokenStream, source: TokenStream) -> TokenStream {
     let mut name_string = args.to_string();
