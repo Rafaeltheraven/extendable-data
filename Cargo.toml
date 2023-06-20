@@ -15,7 +15,7 @@ description = "A set of rust macros that allows you to specify data that can be 
 members = ["extendable-data-helpers"]
 
 [workspace.package]
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Rafael Dulfer"]
 repository = "https://github.com/Rafaeltheraven/extendable-data"
 license = "MIT"
