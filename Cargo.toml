@@ -35,4 +35,4 @@ proc-macro2 = {workspace = true}
 extendable-data-helpers = "0.1.2"
 
 [dev-dependencies]
-syn = {features = ["extra-traits"]}
+syn = {version = "2.0.18", features = ["extra-traits"]}

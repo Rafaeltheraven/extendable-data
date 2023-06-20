@@ -1,10 +1,91 @@
+
+use std::collections::{HashMap, HashSet};
+use std::{mem};
+use std::ops::{IndexMut};
 pub use extendable_data_helpers::extendable_data;
-use syn::token::{Comma, Lt, Gt, Where};
-use syn::{self, DeriveInput, Generics, GenericParam, WhereClause, WherePredicate};
+use syn::meta::ParseNestedMeta;
+use syn::token::{Comma, Lt, Gt, Where, Brace, Paren};
+use syn::{self, DeriveInput, Generics, GenericParam, WhereClause, WherePredicate, Variant, Attribute, Path, Fields, FieldsNamed, FieldsUnnamed};
+use syn::parse::{Result};
 use syn::punctuated::{Punctuated};
 use syn::Fields::*;
 use proc_macro2::{TokenStream, Ident, Span};
-use quote::quote;
+use quote::{quote, ToTokens};
+
+
+fn overwrite_optionals<T>(option_a: Option<T>, option_b: Option<T>) -> Option<T> {
+    match (&option_a, &option_b) {
+        (Some(_), None) => option_a,
+        _ => option_b
+    }
+}
+
+fn path_into_string(path: Path) -> String {
+    path.into_token_stream().to_string()
+}
+
+fn path_to_string(path: &Path) -> String {
+    path.to_token_stream().to_string()
+}
+
+fn meta_to_string(meta: &syn::Meta) -> String {
+    match meta {
+        syn::Meta::Path(p) => path_to_string(p),
+        syn::Meta::List(m) => path_to_string(&m.path),
+        syn::Meta::NameValue(m) => path_to_string(&m.path)
+    }
+}
+
+trait Len {
+    fn len(&self) -> usize;
+}
+
+impl<T> Len for Vec<T> {
+    fn len(&self) -> usize {
+        self.len()
+    }
+}
+
+impl<T, P> Len for Punctuated<T, P> {
+    fn len(&self) -> usize {
+        self.len()
+    }
+}
+
+fn combine_iters<T, U, F1, F2>(iter_a: T, iter_b: T, to_str: F1, handle_conflict: F2, args: &Args) -> T
+where
+    T: IntoIterator<Item = U> + Default + Extend<U> + IndexMut<usize, Output = U> + Len,
+    F1: Fn(&U) -> String,
+    F2: Fn(&mut T, usize, U, &Args)
+{
+    let mut seen: HashMap<String, usize> = HashMap::with_capacity(iter_a.len()); // Will always need exactly this much
+    let mut combined: T = <T as std::default::Default>::default();
+    let mut i = 0;
+    for a in iter_a.into_iter() {
+        let repr = to_str(&a);
+        if !args.filter.contains(&repr) {
+            seen.insert(repr, i);
+            combined.extend([a]);
+            i += 1;
+        }
+    }
+    for b in iter_b.into_iter() {
+        if let Some(i) = seen.remove(&to_str(&b)) {
+            handle_conflict(&mut combined, i, b, args);
+        } else {
+            combined.extend([b]);
+        }
+    }
+    combined
+}
+
+fn handle_conflicts_basic<T: IntoIterator<Item = U> + Default + Extend<U> + IndexMut<usize, Output = U> + Len, U>(list: &mut T, index: usize, data: U, _args: &Args) {
+    list[index] = data;
+}
+
+fn combine_attrs(attr_a: Vec<Attribute>, attr_b: Vec<Attribute>, args: &Args) -> Vec<Attribute> {
+    combine_iters(attr_a, attr_b, |x| meta_to_string(&x.meta), handle_conflicts_basic, args)
+}
 
 fn combine_wheres(where_a: WhereClause, where_b: WhereClause) -> WhereClause {
     let pred_a = where_a.predicates.into_iter();
@@ -35,49 +116,70 @@ fn combine_generics(input_a: Generics, input_b: Generics) -> Generics {
     }
 }
 
-fn combine_enums<'input>(enum_a: &'input syn::DataEnum, enum_b: &'input syn::DataEnum) -> TokenStream {
-    let data = enum_a.variants.iter().chain(enum_b.variants.iter());
-    quote!({
-        #(#data),*
-    })
-}
-
-fn combine_structs<'input>(struct_a: &'input syn::DataStruct, struct_b: &'input syn::DataStruct) -> TokenStream {
-    match (&struct_a.fields, &struct_b.fields) {
-        (Named(fields_a), Named(fields_b)) => {
-            let combined = fields_a.named.pairs().chain(fields_b.named.pairs());
-            quote!({
-                #(#combined),*
-            })
-        },
-        (Unnamed(fields_a), Unnamed(fields_b)) => {
-            let combined = fields_a.unnamed.iter().chain(fields_b.unnamed.iter());
-            quote! {
-                (#(#combined),*);
-            }
-        },
-        (Unit, Named(fields)) | (Named(fields), Unit) => {
-            quote!(#fields)
-        },
-        (Unit, Unnamed(fields)) | (Unnamed(fields), Unit) => {
-            quote!(#fields;)
-        }
-        (Unit, Unit) => quote!(;),
-        _ => panic!("Can not combine provided structs as it makes no logical sense.")
+fn combine_fields_named(fields_a: FieldsNamed, fields_b: FieldsNamed, args: &Args) -> FieldsNamed {
+    FieldsNamed {
+        brace_token: Brace::default(),
+        named: combine_iters(fields_a.named, fields_b.named, |x| x.ident.as_ref().unwrap().to_string(), handle_conflicts_basic, args)
     }
 }
 
-fn combine_unions<'input>(union_a: &'input syn::DataUnion, union_b: &'input syn::DataUnion) -> TokenStream {
-    let data = union_a.fields.named.pairs().chain(union_b.fields.named.pairs());
+fn combine_fields(fields_a: Fields, fields_b: Fields, args: &Args, merging: bool) -> Fields {
+    match (fields_a, fields_b) {
+        (_, f) if !merging => f,
+        (Named(fields_a), Named(fields_b)) => {
+            Named(combine_fields_named(fields_a, fields_b, args))
+        },
+        (Unnamed(fields_a), Unnamed(fields_b)) => {
+            Unnamed(FieldsUnnamed {
+                paren_token: Paren::default(),
+                unnamed: combine_iters(fields_a.unnamed, fields_b.unnamed, |x| x.ty.to_token_stream().to_string(), handle_conflicts_basic, args)
+            })
+        },
+        (Unit, f) | (f, Unit) => f,
+        _ => panic!("Can not combine provided structs as it makes no logical sense. Either make sure they are the same type, or filter out the offending struct.")
+    }
+}
+
+fn combine_enum_variants(variants_a: Punctuated<Variant, Comma>, variants_b: Punctuated<Variant, Comma>, args: Args) -> Punctuated<Variant, Comma> {
+    fn handle_merge_conflict(combined: &mut Punctuated<Variant, Comma>, i: usize, b: Variant, args: &Args) {
+        let a = mem::replace(&mut combined[i], b);
+        combined[i].attrs = combine_attrs(a.attrs, mem::take(&mut combined[i].attrs), args);
+        combined[i].fields = combine_fields(a.fields, mem::replace(&mut combined[i].fields, Unit), args, args.merge);
+        combined[i].discriminant = overwrite_optionals(a.discriminant, mem::take(&mut combined[i].discriminant));
+    }
+    let handle_conflicts = if args.merge {
+        handle_merge_conflict
+    } else {
+        handle_conflicts_basic
+    };
+    combine_iters(variants_a, variants_b, |x| x.ident.to_string(), handle_conflicts, &args)
+}
+
+fn combine_enums(enum_a: syn::DataEnum, enum_b: syn::DataEnum, args: Args) -> TokenStream {
+    let variants = combine_enum_variants(enum_a.variants, enum_b.variants, args);
     quote!({
-        #(#data),*
+        #variants
     })
+}
+
+fn combine_structs(struct_a: syn::DataStruct, struct_b: syn::DataStruct, args: Args) -> TokenStream {
+    let fields = combine_fields(struct_a.fields, struct_b.fields, &args, true);
+    match fields {
+        Named(fields) => quote!(#fields),
+        Unnamed(fields) => quote!(#fields;),
+        Unit => quote!(;)
+    }
+}
+
+fn combine_unions(union_a: syn::DataUnion, union_b: syn::DataUnion, args: Args) -> TokenStream {
+    let fields = combine_fields_named(union_a.fields, union_b.fields, &args);
+    quote!({#fields})
 }
 
 fn construct_stream (
         data: TokenStream, 
         data_token: Ident, 
-        visibility: &syn::Visibility, 
+        visibility: syn::Visibility, 
         gens: Generics, 
         name: syn::Ident, 
         attrs: Vec<syn::Attribute>
@@ -86,7 +188,30 @@ fn construct_stream (
         #(#attrs)*
         #visibility #data_token #name #gens #data
     }
-} 
+}
+
+#[derive(Default)]
+struct Args {
+    filter: HashSet<String>,
+    merge: bool
+}
+
+impl Args {
+    fn parse(&mut self, meta: ParseNestedMeta) -> Result<()> {
+        if meta.path.is_ident("filter") {
+            meta.parse_nested_meta(|meta| {
+                let ident: String = path_into_string(meta.path);
+                self.filter.insert(ident);
+                Ok(())
+            })
+        } else if meta.path.is_ident("merge_on_conflict") {
+            self.merge = true;
+            Ok(())
+        } else {
+            Err(meta.error("Unsupported argument"))
+        }
+    }
+}
 
 /// Combines two enums into a single enum using TokenStreams.
 ///
@@ -94,18 +219,25 @@ fn construct_stream (
 /// of two enums glued together. The name of the enum in input_b will be the name of the "new" enum.
 ///
 /// Technically this could probably be extended to structs as well, but I haven't looked into it.
-pub fn combine_data(input_a: TokenStream, input_b: TokenStream) -> TokenStream {
+pub fn combine_data(input_a: TokenStream, input_b: TokenStream, args_input: Option<TokenStream>) -> TokenStream {
     let ast_a = syn::parse2::<DeriveInput>(input_a).unwrap();
     let ast_b = syn::parse2::<DeriveInput>(input_b).unwrap();
-    let vis_b = &ast_b.vis;
+    let mut args = Args::default();
+    if let Some(a) = args_input {
+        let arg_parser = syn::meta::parser(|meta| args.parse(meta));
+        if let Err(e) = syn::parse::Parser::parse2(arg_parser, a) {
+            e.to_compile_error();
+        }
+    }
     let generics = combine_generics(ast_a.generics, ast_b.generics);
-    let attrs = ast_a.attrs.into_iter().chain(ast_b.attrs.into_iter()).collect();
-    let (data, data_token) = match (&ast_a.data, &ast_b.data) {
-        (syn::Data::Enum(enum_a), syn::Data::Enum(enum_b)) => (combine_enums(enum_a, enum_b), "enum"),
-        (syn::Data::Struct(struct_a), syn::Data::Struct(struct_b)) => (combine_structs(struct_a, struct_b), "struct"),
-        (syn::Data::Union(union_a), syn::Data::Union(union_b)) => (combine_unions(union_a, union_b), "union"),
+    let attrs = combine_attrs(ast_a.attrs, ast_b.attrs, &args);
+    let (data, data_token) = match (ast_a.data, ast_b.data) {
+        (syn::Data::Enum(enum_a), syn::Data::Enum(enum_b)) => (combine_enums(enum_a, enum_b, args), "enum"),
+        (syn::Data::Struct(struct_a), syn::Data::Struct(struct_b)) => (combine_structs(struct_a, struct_b, args), "struct"),
+        (syn::Data::Union(union_a), syn::Data::Union(union_b)) => (combine_unions(union_a, union_b, args), "union"),
         _ => panic!("Can only combine 2 of the same type of data structure!")
     };
+    let vis_b = ast_b.vis;
     construct_stream(data, Ident::new(data_token, Span::call_site()), vis_b, generics, ast_b.ident, attrs)
 }
 
@@ -153,7 +285,7 @@ mod tests {
                 Six
             }
         };
-        let result = combine_data(enum_a, enum_b);
+        let result = combine_data(enum_a, enum_b, None);
         assert_streams(result, expected);
     }
 
@@ -175,7 +307,7 @@ mod tests {
                 two: SomeType
             }
         };
-        let result = combine_data(struct_a, struct_b);
+        let result = combine_data(struct_a, struct_b, None);
         assert_streams(result, expected);
     }
 
@@ -190,7 +322,7 @@ mod tests {
         let expected = quote! {
             struct B(i32, SomeType, i64, Another);
         };
-        let result = combine_data(struct_a, struct_b);
+        let result = combine_data(struct_a, struct_b, None);
         assert_streams(result, expected);
     }
 
@@ -231,11 +363,11 @@ mod tests {
         };
 
         // Don't care for testing, just clone
-        let result_unit = combine_data(struct_a.clone(), struct_b);
-        let result_named_one = combine_data(struct_a.clone(), struct_c.clone());
-        let result_named_two = combine_data(struct_c, struct_a.clone());
-        let result_unnamed_one = combine_data(struct_a.clone(), struct_d.clone());
-        let result_unnamed_two = combine_data(struct_d, struct_a);
+        let result_unit = combine_data(struct_a.clone(), struct_b, None);
+        let result_named_one = combine_data(struct_a.clone(), struct_c.clone(), None);
+        let result_named_two = combine_data(struct_c, struct_a.clone(), None);
+        let result_unnamed_one = combine_data(struct_a.clone(), struct_d.clone(), None);
+        let result_unnamed_two = combine_data(struct_d, struct_a, None);
 
         assert_streams(result_unit, expected_unit);
         assert_streams(result_named_one, expected_named_one);
@@ -255,7 +387,7 @@ mod tests {
                 Thing
             }
         };
-        combine_data(input_a, input_b);
+        combine_data(input_a, input_b, None);
 
     }
 
@@ -270,7 +402,7 @@ mod tests {
                 one: i32
             }
         };
-        combine_data(input_a, input_b);
+        combine_data(input_a, input_b, None);
     }
 
     #[test]
@@ -291,7 +423,7 @@ mod tests {
                 Two
             }
         };
-        let result = combine_data(input_a, input_b);
+        let result = combine_data(input_a, input_b, None);
         assert_streams(result, expected);
     }
 
@@ -320,7 +452,7 @@ mod tests {
                 Two
             }
         };
-        let result = combine_data(input_a, input_b);
+        let result = combine_data(input_a, input_b, None);
         assert_streams(result, expected);
         
         let input_a = quote! {
@@ -340,7 +472,7 @@ mod tests {
                 one: i32
             }
         };
-        let result = combine_data(input_a, input_b);
+        let result = combine_data(input_a, input_b, None);
         assert_streams(result, expected);
 
     }
@@ -363,7 +495,137 @@ mod tests {
                 Two(Thing<'efil, U>)
             }
         };
-        let result = combine_data(input_a, input_b);
+        let result = combine_data(input_a, input_b, None);
+        assert_streams(result, expected);
+    }
+
+    #[test]
+    fn test_namespace_confict_overwrite() {
+        let input_a = quote! {
+            enum A {
+                One,
+                #[one_attr]
+                Two,
+                Three {
+                    x: i32
+                }
+            }
+        };
+        let input_b = quote! {
+            enum B {
+                #[two_attr]
+                Two(Thing),
+                Three {
+                    y: i32
+                },
+                Four
+            }
+        };
+        let expected = quote! {
+            enum B {
+                One,
+                #[two_attr]
+                Two(Thing),
+                Three {
+                    y: i32
+                },
+                Four
+            }
+        };
+        let result = combine_data(input_a, input_b, None);
+        assert_streams(result, expected);
+    }
+
+    #[test]
+    fn test_namespace_conflict_merge() {
+        let input_a = quote! {
+            enum A {
+                One,
+                #[one_attr]
+                Two,
+                Three {
+                    x: i32
+                }
+            }
+        };
+        let input_b = quote! {
+            enum B {
+                #[two_attr]
+                Two(Thing),
+                Three {
+                    y: i32
+                },
+                Four
+            }
+        };
+        let expected = quote! {
+            enum B {
+                #[one_attr]
+                #[two_attr]
+                Two(Thing),
+                Three {
+                    x: i32,
+                    y: i32
+                },
+                Four
+            }
+        };
+        let args = quote!(merge_on_conflict, filter(One));
+        let result = combine_data(input_a, input_b, Some(args));
+        assert_streams(result, expected);
+    }
+
+    #[test]
+    fn test_namespace_conflict_struct() {
+        let input_a = quote! {
+            struct A {
+                x: i32,
+                y: i32
+            }
+        };
+        let input_b = quote! {
+            struct B {
+                x: i64
+            }
+        };
+        let expected = quote! {
+            struct B {
+                x: i64,
+                y: i32
+            }
+        };
+        let result = combine_data(input_a, input_b, None);
+        assert_streams(result, expected);
+    }
+
+    #[test]
+    fn test_filter() {
+        let input_a = quote! {
+            #[attr]
+            enum A {
+                #[another_attr]
+                One,
+                Two,
+                #[another_attr]
+                Three
+            }
+        };
+        let input_b = quote! {
+            enum B {
+                One,
+                Four,
+            }
+        };
+        let expected = quote! {
+            enum B {
+                One,
+                #[another_attr]
+                Three,
+                Four
+            }
+        };
+        let filter = quote!(filter(Two, attr, another_attr));
+        let result = combine_data(input_a, input_b, Some(filter));
         assert_streams(result, expected);
     }
 }

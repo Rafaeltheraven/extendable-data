@@ -17,12 +17,13 @@ pub fn extendable_data(args: TokenStream, source: TokenStream) -> TokenStream {
         use proc_macro::TokenStream;
 
         #[proc_macro_attribute]
-        pub fn #name(_attr: TokenStream, dst: TokenStream) -> TokenStream {
+        pub fn #name(args: TokenStream, dst: TokenStream) -> TokenStream {
             let base = TokenStream2::from(quote! {
                 #source_ast
             });
             let dst_convert: TokenStream2 = dst.into();
-            let resp: TokenStream = extendable_data::combine_data(base, dst_convert).into();
+            let args_convert: TokenStream2 = args.into();
+            let resp: TokenStream = extendable_data::combine_data(base, dst_convert, Some(args_convert)).into();
             resp
         }
     })
