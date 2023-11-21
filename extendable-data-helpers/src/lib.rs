@@ -17,19 +17,14 @@ pub fn extendable_data(args: TokenStream, source: TokenStream) -> TokenStream {
     }
     let name = Ident::new(&name_string, Span::call_site());
     TokenStream::from(quote! {
-        use quote::quote;
-        use proc_macro2::TokenStream as TokenStream2;
-        use proc_macro::TokenStream;
-
         #[proc_macro_attribute]
-        pub fn #name(args: TokenStream, dst: TokenStream) -> TokenStream {
-            let base = TokenStream2::from(quote! {
+        pub fn #name(args: proc_macro::TokenStream, dst: proc_macro::TokenStream) -> proc_macro::TokenStream {
+            let base = proc_macro2::TokenStream::from(quote::quote! {
                 #source_ast
             });
-            let dst_convert: TokenStream2 = dst.into();
-            let args_convert: TokenStream2 = args.into();
-            let resp: TokenStream = extendable_data::combine_data(base, dst_convert, Some(args_convert)).into();
-            resp
+            let dst_convert: proc_macro2::TokenStream = dst.into();
+            let args_convert: proc_macro2::TokenStream = args.into();
+            extendable_data::combine_data(base, dst_convert, Some(args_convert)).into()
         }
     })
 }
